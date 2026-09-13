@@ -118,4 +118,3 @@ response = requests.post(url, data={
 })
 print("=== TELEGRAM RESPONSE ===")
 print(response.text)
-})
