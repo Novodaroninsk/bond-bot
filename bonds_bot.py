@@ -87,14 +87,18 @@ prompt = f"""Ты — аналитик, работающий по стратег
 # --- Запрос к DeepSeek ---
 try:
     ds_response = client_deepseek.chat.completions.create(
-       model="deepseek-chat",
+        model="deepseek-chat",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         max_tokens=500
     )
     ds_analysis = ds_response.choices[0].message.content
+    print("=== DEEPSEEK OK ===")
+    print(ds_analysis)
 except Exception as e:
     ds_analysis = f"Ошибка DeepSeek: {e}"
+    print("=== DEEPSEEK ERROR ===")
+    print(e)
 
 # --- Формируем итоговое сообщение ---
 full_message = (
