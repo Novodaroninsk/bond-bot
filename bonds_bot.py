@@ -112,8 +112,10 @@ url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 if len(full_message) > 4096:
     full_message = full_message[:4090] + "..."
 
-requests.post(url, data={
+response = requests.post(url, data={
     "chat_id": CHAT_ID,
-    "text": full_message,
-    "parse_mode": "Markdown"
+    "text": full_message
+})
+print("=== TELEGRAM RESPONSE ===")
+print(response.text)
 })
