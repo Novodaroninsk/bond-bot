@@ -87,7 +87,7 @@ prompt = f"""Ты — аналитик, работающий по стратег
 # --- Запрос к DeepSeek ---
 try:
     ds_response = client_deepseek.chat.completions.create(
-        model="deepseek-v4-flash",
+       model="deepseek-chat",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
         max_tokens=500
