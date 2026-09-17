@@ -82,9 +82,18 @@ if FMP_KEY:
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
         url_fmp = f"https://financialmodelingprep.com/stable/economic-calendar?from={today}&to={tomorrow}&apikey={FMP_KEY}"
         r = requests.get(url_fmp, timeout=15)
-        events = r.json()
-        print("=== FMP RAW RESPONSE ===")
-        print(events)
+        print("=== FMP STATUS ===")
+        print(r.status_code)
+        print("=== FMP RAW TEXT (first 500 chars) ===")
+        print(r.text[:500])
+
+        # Безопасно пытаемся распарсить JSON
+        try:
+            events = r.json()
+        except Exception as parse_err:
+            calendar_text = f"\n⚠️ FMP вернул не JSON: {r.text[:200]}"
+            print(calendar_text)
+            events = []
 
         # Проверяем, что ответ — список. Если нет — это ошибка API.
         if not isinstance(events, list):
