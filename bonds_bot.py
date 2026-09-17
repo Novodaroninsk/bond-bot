@@ -31,9 +31,11 @@ def get_stats(ticker):
         last = s.iloc[-1]
         prev1 = s.iloc[-2] if len(s) >= 2 else last
         prev5 = s.iloc[-6] if len(s) >= 6 else last
-        return last, last - prev1, last - prev5
-    except Exception as e:
-        return None, None, None
+        prev20 = s.iloc[-21] if len(s) >= 21 else last
+        prev60 = s.iloc[-61] if len(s) >= 61 else last
+        return last, last - prev1, last - prev5, last - prev20, last - prev60
+    except Exception:
+        return None, None, None, None, None
 
 lines = ["📊 *Доходности облигаций*"]
 current = {}
