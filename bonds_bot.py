@@ -2,7 +2,6 @@ import os
 import requests
 from fredapi import Fred
 from openai import OpenAI
-from biquote import Biquote
 
 # --- Ключи ---
 FRED_KEY = os.getenv("FRED_KEY")
