@@ -80,35 +80,45 @@ if FMP_KEY:
         from datetime import datetime, timedelta
         today = datetime.now().strftime("%Y-%m-%d")
         tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={today}&to={tomorrow}&apikey={FMP_KEY}"
+        url_fmp = f"https://financialmodelingprep.com/stable/economic-calendar?from={today}&to={tomorrow}&apikey={FMP_KEY}"
         r = requests.get(url_fmp, timeout=15)
         events = r.json()
+        print("=== FMP RAW RESPONSE ===")
+        print(events)
 
-        COUNTRIES = {"US", "EU", "GB", "JP", "AU"}
-        cal_lines = ["", "📅 Экономический календарь (High Impact):"]
-        count = 0
-
-        for ev in events:
-            if ev.get("country") not in COUNTRIES:
-                continue
-            if str(ev.get("impact", "")).lower() != "high":
-                continue
-            date = ev.get("date", "?")
-            country = ev.get("country", "?")
-            event = ev.get("event", "?")
-            estimate = ev.get("estimate", "-")
-            previous = ev.get("previous", "-")
-            cal_lines.append(f"• {date} | {country} | {event}")
-            cal_lines.append(f"  прогноз: {estimate}, пред.: {previous}")
-            count += 1
-            if count >= 5:
-                break
-
-        if count > 0:
-            calendar_text = "\n".join(cal_lines)
+        # Проверяем, что ответ — список. Если нет — это ошибка API.
+        if not isinstance(events, list):
+            calendar_text = f"\n⚠️ FMP вернул ошибку: {events}"
+            print(calendar_text)
         else:
-            calendar_text = "\n📅 Нет важных событий по нашим валютам в ближайшие 24 часа."
-        print(calendar_text)
+            COUNTRIES = {"US", "EU", "GB", "JP", "AU"}
+            cal_lines = ["", "📅 Экономический календарь (High Impact):"]
+            count = 0
+
+            for ev in events:
+                if not isinstance(ev, dict):
+                    continue
+                if ev.get("country") not in COUNTRIES:
+                    continue
+                impact = str(ev.get("impact", "")).lower()
+                if impact not in ("high", "3"):
+                    continue
+                date = ev.get("date", "?")
+                country = ev.get("country", "?")
+                event = ev.get("event", "?")
+                estimate = ev.get("estimate", "-")
+                previous = ev.get("previous", "-")
+                cal_lines.append(f"• {date} | {country} | {event}")
+                cal_lines.append(f"  прогноз: {estimate}, пред.: {previous}")
+                count += 1
+                if count >= 5:
+                    break
+
+            if count > 0:
+                calendar_text = "\n".join(cal_lines)
+            else:
+                calendar_text = "\n📅 Нет важных событий по нашим валютам в ближайшие 24 часа."
+            print(calendar_text)
     except Exception as e:
         calendar_text = f"\n⚠️ Ошибка календаря: {e}"
         print(calendar_text)
