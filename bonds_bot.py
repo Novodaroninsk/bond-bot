@@ -209,16 +209,26 @@ except Exception as e:
     print("=== DEEPSEEK ERROR ===")
     print(repr(e))
 
-# --- Формируем сообщение ---
-full_message = data_text + calendar_text + "\n\n🧠 Анализ DeepSeek:\n" + ds_analysis
-
+# --- Отправка в Telegram (2 сообщения) ---
 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-if len(full_message) > 4096:
-    full_message = full_message[:4090] + "..."
 
-response = requests.post(url, data={
+# Сообщение 1: данные + календарь
+msg1 = data_text + calendar_text
+response1 = requests.post(url, data={
     "chat_id": CHAT_ID,
-    "text": full_message
+    "text": msg1
 })
-print("=== TELEGRAM RESPONSE ===")
-print(response.text)
+print("=== TELEGRAM RESPONSE 1 (DATA) ===")
+print(response1.text)
+
+# Сообщение 2: анализ DeepSeek
+msg2 = "🧠 Анализ DeepSeek:\n\n" + ds_analysis
+if len(msg2) > 4096:
+    msg2 = msg2[:4090] + "... (обрезано)"
+
+response2 = requests.post(url, data={
+    "chat_id": CHAT_ID,
+    "text": msg2
+})
+print("=== TELEGRAM RESPONSE 2 (ANALYSIS) ===")
+print(response2.text)
