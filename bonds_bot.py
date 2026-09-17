@@ -72,25 +72,49 @@ for a, b, label in PAIRS:
 data_text = "\n".join(lines)
 print(data_text)
 
-# --- Экономический календарь (biquote) ---
+# --- Экономический календарь (FMP) ---
 calendar_text = ""
-try:
-    bq = Biquote()
-    events = bq.calendar(importance="high", countries="US,EU,GB,JP,AU")
-    if events:
+FMP_KEY = os.getenv("FMP_API_KEY")
+
+if FMP_KEY:
+    try:
+        from datetime import datetime, timedelta
+        today = datetime.now().strftime("%Y-%m-%d")
+        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        url_fmp = f"https://financialmodelingprep.com/api/v3/economic_calendar?from={today}&to={tomorrow}&apikey={FMP_KEY}"
+        r = requests.get(url_fmp, timeout=15)
+        events = r.json()
+
+        COUNTRIES = {"US", "EU", "GB", "JP", "AU"}
         cal_lines = ["", "📅 Экономический календарь (High Impact):"]
-        for ev in events[:5]:  # ограничим 5 ближайшими
-            title = ev.get("title", "?")
+        count = 0
+
+        for ev in events:
+            if ev.get("country") not in COUNTRIES:
+                continue
+            if str(ev.get("impact", "")).lower() != "high":
+                continue
+            date = ev.get("date", "?")
             country = ev.get("country", "?")
-            release = ev.get("release_time", "?")
-            forecast = ev.get("forecast", "-")
+            event = ev.get("event", "?")
+            estimate = ev.get("estimate", "-")
             previous = ev.get("previous", "-")
-            cal_lines.append(f"• {release} | {country} | {title}")
-            cal_lines.append(f"  прогноз: {forecast}, пред.: {previous}")
-        calendar_text = "\n".join(cal_lines)
+            cal_lines.append(f"• {date} | {country} | {event}")
+            cal_lines.append(f"  прогноз: {estimate}, пред.: {previous}")
+            count += 1
+            if count >= 5:
+                break
+
+        if count > 0:
+            calendar_text = "\n".join(cal_lines)
+        else:
+            calendar_text = "\n📅 Нет важных событий по нашим валютам в ближайшие 24 часа."
         print(calendar_text)
-except Exception as e:
-    calendar_text = f"⚠️ Ошибка календаря: {e}"
+    except Exception as e:
+        calendar_text = f"\n⚠️ Ошибка календаря: {e}"
+        print(calendar_text)
+else:
+    calendar_text = "\n📅 Календарь отключён (нет FMP_API_KEY)."
     print(calendar_text)
 
 # --- Промпт для DeepSeek ---
