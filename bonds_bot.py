@@ -71,68 +71,59 @@ for a, b, label in PAIRS:
 data_text = "\n".join(lines)
 print(data_text)
 
-# --- Экономический календарь (FMP) ---
+# --- Экономический календарь (ForexFactory XML) ---
 calendar_text = ""
-FMP_KEY = os.getenv("FMP_API_KEY")
+try:
+    import xml.etree.ElementTree as ET
+    from datetime import datetime, timedelta
 
-if FMP_KEY:
-    try:
-        from datetime import datetime, timedelta
-        today = datetime.now().strftime("%Y-%m-%d")
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
-        url_fmp = f"https://financialmodelingprep.com/stable/economic-calendar?from={today}&to={tomorrow}&apikey={FMP_KEY}"
-        r = requests.get(url_fmp, timeout=15)
-        print("=== FMP STATUS ===")
-        print(r.status_code)
-        print("=== FMP RAW TEXT (first 500 chars) ===")
-        print(r.text[:500])
+    url_ff = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
+    r = requests.get(url_ff, timeout=15)
+    print("=== FF STATUS ===")
+    print(r.status_code)
 
-        # Безопасно пытаемся распарсить JSON
+    root = ET.fromstring(r.content)
+    COUNTRIES = {"USD", "EUR", "GBP", "JPY", "AUD", "CAD", "NZD"}
+    now = datetime.now()
+    in_24h = now + timedelta(hours=24)
+
+    cal_lines = ["", "📅 Экономический календарь (High Impact, 24ч):"]
+    count = 0
+
+    for event in root.findall("event"):
+        country = event.findtext("country", "").strip().upper()
+        impact = event.findtext("impact", "").strip().lower()
+        if country not in COUNTRIES:
+            continue
+        if impact != "high":
+            continue
+
+        title = event.findtext("title", "?")
+        date_str = event.findtext("date", "")
+        time_str = event.findtext("time", "")
+        forecast = event.findtext("forecast", "-") or "-"
+        previous = event.findtext("previous", "-") or "-"
+
+        # Парсим дату/время события
         try:
-            events = r.json()
-        except Exception as parse_err:
-            calendar_text = f"\n⚠️ FMP вернул не JSON: {r.text[:200]}"
-            print(calendar_text)
-            events = []
+            dt = datetime.strptime(f"{date_str} {time_str}", "%m-%d-%Y %I:%M%p")
+        except Exception:
+            dt = None
 
-        # Проверяем, что ответ — список. Если нет — это ошибка API.
-        if not isinstance(events, list):
-            calendar_text = f"\n⚠️ FMP вернул ошибку: {events}"
-            print(calendar_text)
-        else:
-            COUNTRIES = {"US", "EU", "GB", "JP", "AU"}
-            cal_lines = ["", "📅 Экономический календарь (High Impact):"]
-            count = 0
+        if dt and now <= dt <= in_24h:
+            cal_lines.append(f"• {dt.strftime('%d.%m %H:%M')} | {country} | {title}")
+            cal_lines.append(f"  прогноз: {forecast}, пред.: {previous}")
+            count += 1
+            if count >= 5:
+                break
 
-            for ev in events:
-                if not isinstance(ev, dict):
-                    continue
-                if ev.get("country") not in COUNTRIES:
-                    continue
-                impact = str(ev.get("impact", "")).lower()
-                if impact not in ("high", "3"):
-                    continue
-                date = ev.get("date", "?")
-                country = ev.get("country", "?")
-                event = ev.get("event", "?")
-                estimate = ev.get("estimate", "-")
-                previous = ev.get("previous", "-")
-                cal_lines.append(f"• {date} | {country} | {event}")
-                cal_lines.append(f"  прогноз: {estimate}, пред.: {previous}")
-                count += 1
-                if count >= 5:
-                    break
-
-            if count > 0:
-                calendar_text = "\n".join(cal_lines)
-            else:
-                calendar_text = "\n📅 Нет важных событий по нашим валютам в ближайшие 24 часа."
-            print(calendar_text)
-    except Exception as e:
-        calendar_text = f"\n⚠️ Ошибка календаря: {e}"
-        print(calendar_text)
-else:
-    calendar_text = "\n📅 Календарь отключён (нет FMP_API_KEY)."
+    if count > 0:
+        calendar_text = "\n".join(cal_lines)
+    else:
+        calendar_text = "\n📅 Нет High Impact событий по нашим валютам в ближайшие 24 часа."
+    print(calendar_text)
+except Exception as e:
+    calendar_text = f"\n⚠️ Ошибка календаря: {e}"
     print(calendar_text)
 
 # --- Промпт для DeepSeek ---
