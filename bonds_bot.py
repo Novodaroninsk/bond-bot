@@ -114,7 +114,7 @@ try:
             cal_lines.append(f"• {dt.strftime('%d.%m %H:%M')} | {country} | {title}")
             cal_lines.append(f"  прогноз: {forecast}, пред.: {previous}")
             count += 1
-            if count >= 5:
+            if count >= 8:
                 break
 
     if count > 0:
