@@ -1,4 +1,3 @@
 fredapi
 requests
 openai
-biquote
