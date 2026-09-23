@@ -28,16 +28,24 @@ BONDS = {
 }
 
 def get_stats(ticker):
-    try:
-        s = fred.get_series(ticker).dropna()
-        last = s.iloc[-1]
-        prev1 = s.iloc[-2] if len(s) >= 2 else last
-        prev5 = s.iloc[-6] if len(s) >= 6 else last
-        prev20 = s.iloc[-21] if len(s) >= 21 else last
-        prev60 = s.iloc[-61] if len(s) >= 61 else last
-        return last, last - prev1, last - prev5, last - prev20, last - prev60
-    except Exception:
-        return None, None, None, None, None
+    """Пытается получить данные. При ошибке — пробует альтернативный тикер (для США: GS10)."""
+    fallbacks = {"DGS10": "GS10"}  # резервный тикер для US 10Y
+    tickers_to_try = [ticker]
+    if ticker in fallbacks:
+        tickers_to_try.append(fallbacks[ticker])
+
+    for t in tickers_to_try:
+        try:
+            s = fred.get_series(t).dropna()
+            last = s.iloc[-1]
+            prev1 = s.iloc[-2] if len(s) >= 2 else last
+            prev5 = s.iloc[-6] if len(s) >= 6 else last
+            prev20 = s.iloc[-21] if len(s) >= 21 else last
+            prev60 = s.iloc[-61] if len(s) >= 61 else last
+            return last, last - prev1, last - prev5, last - prev20, last - prev60
+        except Exception:
+            continue
+    return None, None, None, None, None
 
 lines = ["📊 Доходности облигаций"]
 current = {}
