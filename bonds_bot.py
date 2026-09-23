@@ -30,12 +30,10 @@ BONDS = {
 }
 
 def get_stats(ticker):
-    """Пытается получить данные. При ошибке — пробует альтернативный тикер (для США: GS10)."""
-    fallbacks = {"DGS10": "GS10"}  # резервный тикер для US 10Y
+    fallbacks = {"DGS10": "GS10"}
     tickers_to_try = [ticker]
     if ticker in fallbacks:
         tickers_to_try.append(fallbacks[ticker])
-
     for t in tickers_to_try:
         try:
             s = fred.get_series(t).dropna()
@@ -89,22 +87,19 @@ for a, b, label in PAIRS:
 data_text = "\n".join(lines)
 print(data_text)
 
-# --- Экономический календарь (ForexFactory XML) ---
+# --- Экономический календарь ---
 calendar_text = ""
 try:
     url_ff = "https://nfs.faireconomy.media/ff_calendar_thisweek.xml"
     r = requests.get(url_ff, timeout=15)
     print("=== FF STATUS ===")
     print(r.status_code)
-
     root = ET.fromstring(r.content)
     COUNTRIES = {"USD", "EUR", "GBP", "JPY", "AUD", "CAD", "NZD"}
     now = datetime.now()
     in_24h = now + timedelta(hours=24)
-
     cal_lines = ["", "📅 Экономический календарь (High Impact, 24ч):"]
     count = 0
-
     for event in root.findall("event"):
         country = event.findtext("country", "").strip().upper()
         impact = event.findtext("impact", "").strip().lower()
@@ -112,25 +107,21 @@ try:
             continue
         if impact != "high":
             continue
-
         title = event.findtext("title", "?")
         date_str = event.findtext("date", "")
         time_str = event.findtext("time", "")
         forecast = event.findtext("forecast", "-") or "-"
         previous = event.findtext("previous", "-") or "-"
-
         try:
             dt = datetime.strptime(f"{date_str} {time_str}", "%m-%d-%Y %I:%M%p")
         except Exception:
             dt = None
-
         if dt and now <= dt <= in_24h:
             cal_lines.append(f"• {dt.strftime('%d.%m %H:%M')} | {country} | {title}")
             cal_lines.append(f"  прогноз: {forecast}, пред.: {previous}")
             count += 1
             if count >= 8:
                 break
-
     if count > 0:
         calendar_text = "\n".join(cal_lines)
     else:
@@ -140,7 +131,7 @@ except Exception as e:
     calendar_text = f"\n⚠️ Ошибка календаря: {e}"
     print(calendar_text)
 
-# --- Правила стратегии (для промпта) ---
+# --- Правила стратегии ---
 strategy_rules = """
 СТРАТЕГИЯ: свинг-трейдинг, следуем за потоком капитала.
 
@@ -153,9 +144,15 @@ strategy_rules = """
 - Доходность растёт -> валюта усиливается.
 - Доходность падает -> валюта слабеет.
 - Направление сделки определяется ДИНАМИКОЙ (Δ1д, Δ5д, Δ1м), НЕ абсолютным спредом.
-- Если у валюты A динамика сильнее, чем у B — сделка в сторону A. Даже если A «зрелый и перегретый» — это значит «ждать откат для входа в A», а НЕ «шортить A».
+- Если у валюты A динамика сильнее, чем у B — сделка в сторону A. Даже если A зрелый и перегретый — это значит ждать откат для входа в A, а НЕ шортить A.
 - Если ВСЕ доходности растут одновременно — это глобальный макрофактор, сигналы слабее.
 - Carry-trade: при высоком аппетите к риску деньги идут из JPY в AUD/NZD/GBP.
+
+ОСОБОЕ ПРАВИЛО ПРО JPY:
+Если доходность JPY растёт быстрее остальных (Δ5д > +0.3, Δ1м > +1.0),
+это означает СВОРАЧИВАНИЕ carry-trade. В такой ситуации JPY УСИЛИВАЕТСЯ,
+а не является валютой фондирования. НЕ называй JPY слабой и НЕ рекомендуй
+лонги по парам XXX/JPY только потому, что у них положительный спред.
 
 ТРИ СИСТЕМЫ:
 1. TREND-FOLLOWING: сильный тренд (импульсы 4+ дней), вход на 2-м дне восстановления после коррекции, к 20/50 MA. Стоп 1.5–2×ATR. Цель 0.7×дневной ATR.
@@ -163,7 +160,7 @@ strategy_rules = """
 3. COUNTER-TREND: три условия одновременно — новый экстремум, технический характер движения (3-4 дня), кульминационное ускорение. Вход после слабости (ложный пробой, откат от Bollinger). Стоп 1.5–2×ATR.
 
 ПРАВИЛА ВХОДА:
-- НЕ входить «по рынку».
+- НЕ входить по рынку.
 - Вход на откате к 20/50 MA или на выходе из консолидации (Bollinger Bands).
 - Если нет зазора до максимума — пропускать.
 - Зрелый тренд (Δ3м > 2.0) — только на откате, не догонять.
@@ -179,10 +176,11 @@ strategy_rules = """
 - Не давать противоречивых сетапов.
 - Не рекомендовать сделки без чёткого обоснования.
 - Не предлагать вход против динамики (против потока капитала).
+
 РАЗРЕШЁННЫЕ ПАРЫ:
 - Можно анализировать любые комбинации из 5 валют (USD, EUR, GBP, JPY, AUD).
-- НО: спреды рассчитаны только для пар из блока "Сила валют". Если предлагаешь пару вне списка — обоснуй её самостоятельно.
-- Важно: у тебя НЕТ данных о цене, ATR и графиках. Ты работаешь ТОЛЬКО с доходностями. Если предлагаешь сделку, укажи, что точка входа и ATR должны быть рассчитаны трейдером на графике.
+- НО: спреды рассчитаны только для пар из блока Сила валют.
+- Важно: у тебя НЕТ данных о цене, ATR и графиках. Ты работаешь ТОЛЬКО с доходностями.
 """
 
 # --- Промпт для DeepSeek ---
@@ -202,11 +200,6 @@ prompt = f"""Ты — аналитик, работающий по стратег
 - Δ1м и Δ3м — контекст тренда.
 - Свежий тренд: Δ1д, Δ5д, Δ1м растут синхронно, Δ3м небольшой (<1.5).
 - Зрелый тренд: Δ3м большой (>2.0), Δ1д тормозит — приоритет откату.
-ОСОБОЕ ПРАВИЛО ПРО JPY:
-Если доходность JPY растёт быстрее остальных (Δ5д > +0.3, Δ1м > +1.0),
-это означает СВОРАЧИВАНИЕ carry-trade. В такой ситуации JPY УСИЛИВАЕТСЯ,
-а не является "валютой фондирования". НЕ называй JPY слабой и НЕ рекомендуй
-лонги по парам XXX/JPY только потому, что у них положительный спред.
 
 Проанализируй:
 1. Сильные/слабые валюты с учётом всех таймфреймов?
@@ -221,15 +214,18 @@ prompt = f"""Ты — аналитик, работающий по стратег
 В САМОМ КОНЦЕ ответа добавь блок с JSON (обязательно!):
 
 ===SETUPS===
-{"setups": [{"pair": "XXX/YYY", "direction": "LONG или SHORT", "stop": "1.5-2 ATR", "target": "0.7 ATR", "reason": "кратко"}]}
+{{"setups": [{{"pair": "XXX/YYY", "direction": "LONG", "stop": "1.5-2 ATR", "target": "0.7 ATR", "reason": "кратко"}}]}}
 ===END===
 
 Правила JSON:
-- direction — только "LONG" или "SHORT" (без валюты).
-- Если сетапов нет — {"setups": []}.
-- JSON должен быть валидным (двойные кавычки, без запятых в конце)."""
+- direction — только LONG или SHORT (заглавными).
+- Если сетапов нет — {{"setups": []}}.
+- JSON должен быть валидным."""
 
 # --- Запрос к DeepSeek ---
+setups = []
+ds_analysis_raw = ""
+
 try:
     ds_response = client_deepseek.chat.completions.create(
         model="deepseek-chat",
@@ -237,11 +233,16 @@ try:
         temperature=0.3,
         max_tokens=1100
     )
-    ds_analysis = ds_response.choices[0].message.content
-    # --- Извлекаем setups из JSON ---
-import re
-setups = []
-json_match = re.search(r'===SETUPS===\s*(\{.*?\})\s*===END===', ds_analysis, re.DOTALL)
+    ds_analysis_raw = ds_response.choices[0].message.content
+    print("=== DEEPSEEK OK ===")
+    print(ds_analysis_raw)
+except Exception as e:
+    ds_analysis_raw = f"Ошибка DeepSeek: {e}"
+    print("=== DEEPSEEK ERROR ===")
+    print(repr(e))
+
+# --- Парсим setups из JSON (ВНЕ try/except) ---
+json_match = re.search(r'===SETUPS===\s*(\{.*?\})\s*===END===', ds_analysis_raw, re.DOTALL)
 if json_match:
     try:
         setups_data = json.loads(json_match.group(1))
@@ -251,46 +252,28 @@ if json_match:
     except Exception as je:
         print("=== JSON PARSE ERROR ===")
         print(repr(je))
-    # Убираем JSON-блок из текста анализа (для Telegram)
-    ds_analysis_clean = re.sub(r'===SETUPS===.*?===END===', '', ds_analysis, flags=re.DOTALL).strip()
+    ds_analysis = re.sub(r'===SETUPS===.*?===END===', '', ds_analysis_raw, flags=re.DOTALL).strip()
 else:
-    ds_analysis_clean = ds_analysis
+    ds_analysis = ds_analysis_raw
     print("=== NO JSON BLOCK FOUND ===")
 
-# В Telegram отправляем чистый текст
-ds_analysis = ds_analysis_clean
-    print("=== DEEPSEEK OK ===")
-    print(ds_analysis)
-except Exception as e:
-    ds_analysis = f"Ошибка DeepSeek: {e}"
-    print("=== DEEPSEEK ERROR ===")
-    print(repr(e))
-
-# --- Отправка в Telegram (2 сообщения) ---
+# --- Отправка в Telegram ---
 url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
-# Сообщение 1: данные + календарь
 msg1 = data_text + calendar_text
-response1 = requests.post(url, data={
-    "chat_id": CHAT_ID,
-    "text": msg1
-})
+response1 = requests.post(url, data={"chat_id": CHAT_ID, "text": msg1})
 print("=== TELEGRAM RESPONSE 1 (DATA) ===")
 print(response1.text)
 
-# Сообщение 2: анализ DeepSeek
 msg2 = "🧠 Анализ DeepSeek:\n\n" + ds_analysis
 if len(msg2) > 4096:
     msg2 = msg2[:4090] + "... (обрезано)"
 
-response2 = requests.post(url, data={
-    "chat_id": CHAT_ID,
-    "text": msg2
-})
+response2 = requests.post(url, data={"chat_id": CHAT_ID, "text": msg2})
 print("=== TELEGRAM RESPONSE 2 (ANALYSIS) ===")
 print(response2.text)
 
-# --- Запись в Google Sheets через Apps Script ---
+# --- Запись в Google Sheets ---
 try:
     apps_script_url = os.getenv("APPS_SCRIPT_URL")
 
