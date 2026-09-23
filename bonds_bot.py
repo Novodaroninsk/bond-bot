@@ -1,4 +1,6 @@
 import os
+import json
+import re
 import requests
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -214,7 +216,18 @@ prompt = f"""Ты — аналитик, работающий по стратег
 5. Есть ли важные события в ближайшие 24 часа, влияющие на сетапы?
 6. Финальные сетапы: направление, стоп 1.5–2×ATR, цель, обоснование.
 
-Отвечай лаконично, максимум 250 слов. Без противоречий в выводах."""
+Отвечай лаконично, максимум 250 слов. Без противоречий в выводах.
+
+В САМОМ КОНЦЕ ответа добавь блок с JSON (обязательно!):
+
+===SETUPS===
+{"setups": [{"pair": "XXX/YYY", "direction": "LONG или SHORT", "stop": "1.5-2 ATR", "target": "0.7 ATR", "reason": "кратко"}]}
+===END===
+
+Правила JSON:
+- direction — только "LONG" или "SHORT" (без валюты).
+- Если сетапов нет — {"setups": []}.
+- JSON должен быть валидным (двойные кавычки, без запятых в конце)."""
 
 # --- Запрос к DeepSeek ---
 try:
@@ -225,6 +238,27 @@ try:
         max_tokens=1100
     )
     ds_analysis = ds_response.choices[0].message.content
+    # --- Извлекаем setups из JSON ---
+import re
+setups = []
+json_match = re.search(r'===SETUPS===\s*(\{.*?\})\s*===END===', ds_analysis, re.DOTALL)
+if json_match:
+    try:
+        setups_data = json.loads(json_match.group(1))
+        setups = setups_data.get("setups", [])
+        print("=== SETUPS PARSED ===")
+        print(setups)
+    except Exception as je:
+        print("=== JSON PARSE ERROR ===")
+        print(repr(je))
+    # Убираем JSON-блок из текста анализа (для Telegram)
+    ds_analysis_clean = re.sub(r'===SETUPS===.*?===END===', '', ds_analysis, flags=re.DOTALL).strip()
+else:
+    ds_analysis_clean = ds_analysis
+    print("=== NO JSON BLOCK FOUND ===")
+
+# В Telegram отправляем чистый текст
+ds_analysis = ds_analysis_clean
     print("=== DEEPSEEK OK ===")
     print(ds_analysis)
 except Exception as e:
@@ -263,8 +297,7 @@ try:
     if apps_script_url:
         payload = {
             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "bonds": data_text,
-            "calendar": calendar_text,
+            "setups": setups,
             "analysis": ds_analysis
         }
         resp = requests.post(apps_script_url, json=payload, timeout=15)
