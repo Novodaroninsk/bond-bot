@@ -242,3 +242,23 @@ response2 = requests.post(url, data={
 })
 print("=== TELEGRAM RESPONSE 2 (ANALYSIS) ===")
 print(response2.text)
+
+# --- Запись в Google Sheets через Apps Script ---
+try:
+    apps_script_url = os.getenv("APPS_SCRIPT_URL")
+
+    if apps_script_url:
+        payload = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "bonds": data_text,
+            "calendar": calendar_text,
+            "analysis": ds_analysis
+        }
+        resp = requests.post(apps_script_url, json=payload, timeout=15)
+        print("=== SHEETS RESPONSE ===")
+        print(resp.text)
+    else:
+        print("=== SHEETS SKIPPED (нет APPS_SCRIPT_URL) ===")
+except Exception as e:
+    print("=== SHEETS ERROR ===")
+    print(repr(e))
